@@ -13,8 +13,10 @@ const urls = {
 
 const container = document.querySelector("#teamList");
 const form = document.querySelector("#downloadForm");
+const messageContainer = document.querySelector("#messageContainer");
 
 const template = await loadTemplate("/templates/teamItem.html");
+const messageTemplate = await loadTemplate("/templates/messageItem.html");
 
 const response = await fetch(urls.pdfs);
 const payload = await response.json();
@@ -46,34 +48,69 @@ function formatDate(s) {
 }
 
 
+function showMessage(message, type = "success") {
+  // Clear previous messages
+  messageContainer.innerHTML = "";
+  
+  // Create and display message
+  const messageElement = fillTemplate(messageTemplate, {
+    message: message,
+    messageClass: type
+  });
+  
+  messageContainer.appendChild(messageElement);
+  
+  // Auto-hide success messages after 5 seconds
+  if (type === "success") {
+    setTimeout(() => {
+      messageContainer.innerHTML = "";
+    }, 5000);
+  }
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+  
+  // Clear any previous messages
+  messageContainer.innerHTML = "";
+  
   const formData = new FormData(form);
   const data = Object.fromEntries(formData);
   data.newsletterAgreement = data.newsletterAgreement ? "true" : "false";
   console.log(data);
-  const response = await fetch(urls.submit, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(data)
-  });
   
-  // Handle PDF response
-  if (!response.ok) {
-    console.error("Error:", response.status, response.statusText);
-    return;
+  try {
+    const response = await fetch(urls.submit, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+    
+    // Handle PDF response
+    if (!response.ok) {
+      showMessage("le formulaire contient des champs invalides", "error");
+      console.error("Error:", response.status, response.statusText);
+      return;
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "rapport-auditcom.pdf"; // You can customize the filename
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+    // Show success message
+    showMessage("PDF téléchargé avec succès !", "success");
+    
+  } catch (error) {
+    showMessage("Le formulaire contient des champs invalides", "error");
+    console.error("Error:", error);
   }
-  
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "document.pdf"; // You can customize the filename
-  document.body.appendChild(a);
-  a.click();
-  window.URL.revokeObjectURL(url);
-  document.body.removeChild(a);
 });
 
